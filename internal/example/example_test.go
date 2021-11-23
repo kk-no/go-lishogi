@@ -1,8 +1,14 @@
 package example
 
-import "github.com/kk-no/go-lishogi"
+import (
+	"os"
+
+	"github.com/kk-no/go-lishogi"
+)
 
 func ExampleNewClient() {
-	cli := lishogi.NewClient(lishogi.SetAccessToken("access_token"))
+	token := os.Getenv("LISHOGI_ACCESS_TOKEN")
+	cli := lishogi.NewClient(lishogi.SetAccessToken(token))
 	_ = cli
+	// // Output:
 }
