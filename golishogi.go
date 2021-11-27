@@ -3,7 +3,7 @@ package lishogi
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,7 +19,8 @@ type Client struct {
 	baseURL       *url.URL
 	authenticator Authenticator
 
-	Team TeamService
+	Team       TeamService
+	Tournament TournamentService
 }
 
 func NewClient(setAuth AuthMethod) *Client {
@@ -31,6 +32,7 @@ func NewClient(setAuth AuthMethod) *Client {
 	setAuth(cli)
 
 	cli.Team = NewTeamService(apiBasePath, cli)
+	cli.Tournament = NewTournamentService("", cli)
 
 	return cli
 }
@@ -66,53 +68,48 @@ func (c *Client) NewRequest(method, path string, body interface{}) (*http.Reques
 	return req, nil
 }
 
-func (c *Client) CreateAndDo(method, relPath string, data, resource interface{}) error {
+func (c *Client) CreateAndDo(method, relPath string, data interface{}) (*http.Response, error) {
 	if strings.HasPrefix(relPath, "/") {
 		relPath = strings.TrimLeft(relPath, "/")
 	}
 
 	req, err := c.NewRequest(method, relPath, data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if _, err := c.doGetHeaders(req, resource); err != nil {
-		return err
+	res, err := c.do(req)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return res, nil
 }
 
-func (c *Client) doGetHeaders(req *http.Request, v interface{}) (http.Header, error) {
+func (c *Client) do(req *http.Request) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resErr := CheckResponseError(resp); resErr != nil {
 		return nil, resErr
 	}
 
-	if v != nil {
-		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
-			return nil, err
-		}
-	}
-	return resp.Header, nil
+	return resp, nil
 }
 
 func CheckResponseError(r *http.Response) error {
 	if !isErrorStatusCode(r.StatusCode) {
 		return nil
 	}
-	return errors.New("error cause") // TODO: implements error case
+	return fmt.Errorf("error case: %d", r.StatusCode) // TODO: implements error case
 }
 
 func isErrorStatusCode(code int) bool {
 	return http.StatusBadRequest <= code
 }
 
-func (c *Client) Get(path string, resource interface{}) error {
-	return c.CreateAndDo(http.MethodGet, path, nil, resource)
+func (c *Client) Get(path string) (*http.Response, error) {
+	return c.CreateAndDo(http.MethodGet, path, nil)
 }
